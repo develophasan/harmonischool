@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
-import { GoogleGenAI } from '@google/genai'
-
-// Initialize AI client - API key must be in .env file
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('GEMINI_API_KEY is not set in environment variables')
-}
-
-const ai = process.env.GEMINI_API_KEY 
-  ? new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-    })
-  : null
+import { generateChildSummary } from '@/services/ai-worker'
 
 // Get AI summary for a student
 export async function GET(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
-    const { studentId } = params
+    const { studentId } = await params
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     
@@ -36,10 +25,21 @@ export async function GET(
         },
       })
 
-      // If no summary exists, try to generate one (only if table exists)
+      // If no summary exists, try to generate one using AI Worker
       if (!summary) {
         try {
-          summary = await generateSummary(studentId, targetDate)
+          const generated = await generateChildSummary(studentId, targetDate)
+          // Save to database (V3 format)
+          summary = await prisma.aIChildSummary.create({
+            data: {
+              studentId,
+              date: targetDate,
+              summary: generated.summary,
+              riskExplanation: generated.riskExplanation,
+              homeActivity: generated.homeActivity,
+              positiveNote: generated.positiveNote,
+            },
+          })
         } catch (genError: any) {
           // If table doesn't exist, return null
           if (genError.code === 'P2021' || genError.message?.includes('does not exist')) {
@@ -69,16 +69,42 @@ export async function GET(
 // Generate new AI summary
 export async function POST(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
-    const { studentId } = params
+    const { studentId } = await params
     const body = await request.json()
     const date = body.date ? new Date(body.date) : new Date()
     date.setHours(0, 0, 0, 0)
 
     try {
-      const summary = await generateSummary(studentId, date)
+      // Generate summary using AI Worker
+      const generated = await generateChildSummary(studentId, date)
+      
+      // Save to database (V3 format)
+      const summary = await prisma.aIChildSummary.upsert({
+        where: {
+          studentId_date: {
+            studentId,
+            date,
+          },
+        },
+        update: {
+          summary: generated.summary,
+          riskExplanation: generated.riskExplanation,
+          homeActivity: generated.homeActivity,
+          positiveNote: generated.positiveNote,
+        },
+        create: {
+          studentId,
+          date,
+          summary: generated.summary,
+          riskExplanation: generated.riskExplanation,
+          homeActivity: generated.homeActivity,
+          positiveNote: generated.positiveNote,
+        },
+      })
+      
       return NextResponse.json(summary)
     } catch (tableError: any) {
       // If table doesn't exist, return error message
@@ -100,135 +126,5 @@ export async function POST(
   }
 }
 
-async function generateSummary(studentId: string, date: Date) {
-  // Get student info
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
-    include: {
-      assessments: {
-        include: {
-          scores: {
-            include: { domain: true },
-          },
-        },
-        orderBy: { assessmentDate: 'desc' },
-        take: 1,
-      },
-      emotionSnapshots: {
-        where: {
-          date: {
-            gte: new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000),
-            lte: date,
-          },
-        },
-        orderBy: { date: 'desc' },
-      },
-      dailyLogs: {
-        where: {
-          logDate: {
-            gte: new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000),
-            lte: date,
-          },
-        },
-        orderBy: { logDate: 'desc' },
-        take: 7,
-      },
-    },
-  })
-
-  if (!student) {
-    throw new Error('Student not found')
-  }
-
-  // Prepare context for AI
-  const age = Math.floor(
-    (new Date().getTime() - new Date(student.dateOfBirth).getTime()) /
-      (365.25 * 24 * 60 * 60 * 1000)
-  )
-
-  const recentScores = student.assessments[0]?.scores || []
-  const avgMood =
-    student.emotionSnapshots.length > 0
-      ? student.emotionSnapshots.reduce((sum, s) => sum + s.mood, 0) /
-        student.emotionSnapshots.length
-      : 3
-
-  const context = `
-Çocuk: ${student.firstName} ${student.lastName}, ${age} yaşında
-Son değerlendirme skorları: ${recentScores
-    .map((s) => `${s.domain.nameTr}: ${s.percentage || s.score}/100`)
-    .join(', ')}
-Ortalama duygu durumu (1-5): ${avgMood.toFixed(1)}
-Son günlük notlar: ${student.dailyLogs
-    .map((log) => log.generalNotes)
-    .filter(Boolean)
-    .slice(0, 3)
-    .join('; ')}
-`
-
-  // Generate summary using Google Gemini
-  const systemPrompt = 'Sen Harmoni Anaokulu için çocuk gelişim uzmanısın. Velilere çocuklarının günlük gelişimini sıcak, samimi ve pozitif bir dille anlatıyorsun. Türkçe yazıyorsun.'
-  
-  const userPrompt = `Aşağıdaki bilgilere dayanarak ${student.firstName} için bugünün özetini ve evde yapılabilecek önerileri yaz:\n\n${context}`
-
-  const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
-
-  const config = {
-    thinkingConfig: {
-      thinkingBudget: 0,
-    },
-  }
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-flash-lite-latest',
-    config,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text: fullPrompt,
-          },
-        ],
-      },
-    ],
-  })
-
-  // Extract text from response
-  let aiResponse = ''
-  if (response.text) {
-    aiResponse = response.text
-  } else if (response.candidates && response.candidates[0]?.content?.parts) {
-    aiResponse = response.candidates[0].content.parts
-      .map((part: any) => part.text || '')
-      .join('')
-  }
-  
-  // Split into progress text and recommendation
-  const parts = aiResponse.split('\n\n')
-  const progressText = parts[0] || aiResponse
-  const homeRecommendation = parts[1] || null
-
-  // Save to database
-  const summary = await prisma.aIChildSummary.upsert({
-    where: {
-      studentId_date: {
-        studentId,
-        date,
-      },
-    },
-    update: {
-      progressText,
-      homeRecommendation,
-    },
-    create: {
-      studentId,
-      date,
-      progressText,
-      homeRecommendation,
-    },
-  })
-
-  return summary
-}
+// generateSummary function removed - now using AI Worker service
 

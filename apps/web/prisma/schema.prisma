@@ -76,6 +76,8 @@ model Student {
   healthRecords        HealthRecord[]
   psychologistNotes    PsychologistNote[]
   neuroProfile         ChildNeuroProfile?
+  neuroZProfiles       ChildNeuroZProfile[]
+  neuroRiskProfile     NeuroRiskProfile?
   neuroAlerts          NeuroAlert[]
   emotionSnapshots     DailyEmotionSnapshot[]
   aiSummaries          AIChildSummary[]
@@ -454,22 +456,21 @@ enum AlertSeverity {
   high
 }
 
-model NeuroAlert {
-  id          String        @id @default(uuid())
-  studentId   String        @map("student_id")
-  domain      String        // Domain code (e.g., 'executive_functions')
-  severity    AlertSeverity
-  message     String
-  isResolved  Boolean       @default(false) @map("is_resolved")
-  resolvedAt  DateTime?     @map("resolved_at")
-  resolvedBy  String?       @map("resolved_by")
-  createdAt   DateTime      @default(now()) @map("created_at")
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  resolver User?  @relation(fields: [resolvedBy], references: [id], onDelete: SetNull)
-
-  @@map("neuro_alerts")
-}
+// NeuroAlert V2 (deprecated - use V3 below)
+// model NeuroAlert {
+//   id          String        @id @default(uuid())
+//   studentId   String        @map("student_id")
+//   domain      String
+//   severity    AlertSeverity
+//   message     String
+//   isResolved  Boolean       @default(false) @map("is_resolved")
+//   resolvedAt  DateTime?     @map("resolved_at")
+//   resolvedBy  String?       @map("resolved_by")
+//   createdAt   DateTime      @default(now()) @map("created_at")
+//   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+//   resolver User?  @relation(fields: [resolvedBy], references: [id], onDelete: SetNull)
+//   @@map("neuro_alerts")
+// }
 
 // Daily Emotional Flow - Instagram-style parent view
 model DailyEmotionSnapshot {
@@ -491,21 +492,19 @@ model DailyEmotionSnapshot {
   @@map("daily_emotion_snapshots")
 }
 
-// AI Daily Child Message
-model AIChildSummary {
-  id                String   @id @default(uuid())
-  studentId         String   @map("student_id")
-  date              DateTime @default(now())
-  progressText      String   @map("progress_text")
-  homeRecommendation String? @map("home_recommendation")
-  generatedAt       DateTime @default(now()) @map("generated_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([studentId, date])
-  @@map("ai_child_summaries")
-}
+// AI Daily Child Message - V2 (deprecated, use V3 below)
+// model AIChildSummary {
+//   id                String   @id @default(uuid())
+//   studentId         String   @map("student_id")
+//   date              DateTime @default(now())
+//   progressText      String   @map("progress_text")
+//   homeRecommendation String? @map("home_recommendation")
+//   generatedAt       DateTime @default(now()) @map("generated_at")
+//   createdAt         DateTime @default(now()) @map("created_at")
+//   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+//   @@unique([studentId, date])
+//   @@map("ai_child_summaries")
+// }
 
 // One Tap Assessment - Quick domain scoring
 model QuickAssessment {
@@ -537,6 +536,109 @@ model ChildDevelopmentTrend {
 
   @@unique([studentId, domain, periodStart])
   @@map("child_development_trends")
+}
+
+// ============================================
+// MODÜL 6.5: HARMONI OS V3 - STATISTICAL INTELLIGENCE
+// ============================================
+
+// Age-based normalization table for Z-score calculation
+model NeuroNormTable {
+  id          String   @id @default(uuid())
+  ageInMonths Int      @map("age_in_months") // 24, 30, 36, 42, 48, 54, 60, 66, 72
+  domain      String   // Domain code (executive_functions, language_communication, etc.)
+  mean        Float    // Population mean for this age
+  stdDev      Float    @map("std_dev") // Standard deviation
+  sampleSize  Int      @default(1000) @map("sample_size")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([ageInMonths, domain])
+  @@index([ageInMonths])
+  @@index([domain])
+  @@map("neuro_norm_table")
+}
+
+// Z-Score Profile - Weekly normalized scores
+model ChildNeuroZProfile {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  domain      String   // Domain code
+  rawScore    Float    @map("raw_score") // Original percentage score
+  zScore      Float    @map("z_score") // Normalized Z-score
+  percentile  Float    // Percentile rank (0-100)
+  ageInMonths Int      @map("age_in_months")
+  weekStart   DateTime @map("week_start") // Monday of the week
+  calculatedAt DateTime @default(now()) @map("calculated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, domain, weekStart])
+  @@index([studentId, weekStart])
+  @@index([domain])
+  @@map("child_neuro_z_profiles")
+}
+
+// Statistical Risk Profile - Calculated risk scores
+model NeuroRiskProfile {
+  id                  String   @id @default(uuid())
+  studentId           String   @unique @map("student_id")
+  riskScore           Float    @map("risk_score") // Combined risk score
+  severity            AlertSeverity
+  trendSlope          Float    @map("trend_slope") // Regression slope of last 4 weeks
+  domainImbalance     Float    @map("domain_imbalance") // Std dev across domains
+  emotionalInstability Float   @map("emotional_instability") // Variance of moods
+  weakestDomain       String?  @map("weakest_domain")
+  decliningDomain     String?  @map("declining_domain")
+  strongestDomain     String?  @map("strongest_domain")
+  calculatedAt        DateTime @default(now()) @map("calculated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("neuro_risk_profiles")
+}
+
+// Enhanced NeuroAlert with explainability
+model NeuroAlert {
+  id          String        @id @default(uuid())
+  studentId   String        @map("student_id")
+  domain      String        // Domain code (e.g., 'executive_functions')
+  severity    AlertSeverity
+  message     String
+  explanation String?       // JSON string with explainability data
+  isResolved  Boolean       @default(false) @map("is_resolved")
+  resolvedAt  DateTime?     @map("resolved_at")
+  resolvedBy  String?       @map("resolved_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  resolver User?  @relation(fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@map("neuro_alerts")
+}
+
+// Enhanced AI Summary with V3 structure
+model AIChildSummary {
+  id                String   @id @default(uuid())
+  studentId         String   @map("student_id")
+  date              DateTime @default(now())
+  summary           String   @default("Gelişim takibi devam ediyor.") // Development summary (2 sentences)
+  riskExplanation   String?  @map("risk_explanation") // Simple Turkish risk explanation
+  homeActivity      String?  @map("home_activity") // Specific to weakest domain
+  positiveNote      String?  @map("positive_note") // Positive reinforcement
+  // Legacy V2 fields (deprecated, kept for migration compatibility)
+  progressText      String?  @map("progress_text")
+  homeRecommendation String? @map("home_recommendation")
+  generatedAt       DateTime @default(now()) @map("generated_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+  @@map("ai_child_summaries")
 }
 
 // ============================================

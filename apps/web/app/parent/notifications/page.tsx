@@ -25,10 +25,16 @@ export default function ParentNotificationsPage() {
     setLoading(true)
     try {
       const res = await fetch(`/api/notifications?recipientId=${parentId}&isRead=${filter === "unread" ? "false" : ""}&limit=100`)
+      if (!res.ok) {
+        // If error, return empty array
+        setNotifications([])
+        return
+      }
       const data = await res.json()
       setNotifications(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Error loading notifications:", error)
+      setNotifications([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -126,17 +132,23 @@ export default function ParentNotificationsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-harmony-brain"></div>
           </div>
         ) : notifications.length === 0 ? (
-          <Card className="rounded-2xl shadow-harmony">
+          <Card className="rounded-2xl shadow-xl glass-card">
             <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground py-12">
-                Henüz bildirim yok.
-              </p>
+              <div className="text-center py-12">
+                <Bell className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground text-lg">
+                  Henüz bildirim yok.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Yeni bildirimler burada görünecek.
+                </p>
+              </div>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
             <AnimatePresence>
-              {notifications.map((notification) => (
+              {notifications.filter(n => n && n.id).map((notification) => (
                 <motion.div
                   key={notification.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -144,10 +156,10 @@ export default function ParentNotificationsPage() {
                   exit={{ opacity: 0, y: -20 }}
                 >
                   <Card
-                    className={`rounded-2xl shadow-harmony border-0 transition-all ${
+                    className={`rounded-2xl shadow-xl glass-card hover-lift transition-all ${
                       !notification.isRead
-                        ? "bg-gradient-to-br from-white to-harmony-soft/50 border-l-4 border-l-harmony-heart"
-                        : "bg-gradient-to-br from-white/50 to-harmony-soft/20"
+                        ? "border-l-4 border-l-harmony-heart"
+                        : ""
                     }`}
                   >
                     <CardContent className="pt-6">
@@ -156,10 +168,10 @@ export default function ParentNotificationsPage() {
                         <div className="flex-1">
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <h3 className="font-semibold text-lg mb-1">{notification.title}</h3>
-                              {notification.student && (
+                              <h3 className="font-semibold text-lg mb-1">{notification.title || 'Bildirim'}</h3>
+                              {notification.student && notification.student.firstName && (
                                 <Badge variant="outline" className="mb-2">
-                                  {notification.student.firstName} {notification.student.lastName}
+                                  {notification.student.firstName} {notification.student.lastName || ''}
                                 </Badge>
                               )}
                             </div>
@@ -167,21 +179,23 @@ export default function ParentNotificationsPage() {
                               <div className="h-2 w-2 rounded-full bg-harmony-heart"></div>
                             )}
                           </div>
-                          <p className="text-muted-foreground mb-3">{notification.message}</p>
+                          <p className="text-muted-foreground mb-3">{notification.message || ''}</p>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>
-                                {format(new Date(notification.createdAt), "dd MMMM yyyy, HH:mm", {
-                                  locale: tr,
-                                })}
-                              </span>
-                              {notification.sender && (
+                              {notification.createdAt && (
                                 <span>
-                                  {notification.senderType === "ai"
-                                    ? "🤖 AI"
-                                    : notification.sender.fullName}
+                                  {format(new Date(notification.createdAt), "dd MMMM yyyy, HH:mm", {
+                                    locale: tr,
+                                  })}
                                 </span>
                               )}
+                              {notification.senderType === "ai" ? (
+                                <span>🤖 AI</span>
+                              ) : notification.sender?.fullName ? (
+                                <span>{notification.sender.fullName}</span>
+                              ) : notification.senderType ? (
+                                <span>{notification.senderType}</span>
+                              ) : null}
                             </div>
                             <div className="flex gap-2">
                               {!notification.isRead && (
@@ -208,7 +222,11 @@ export default function ParentNotificationsPage() {
                             <Button
                               variant="link"
                               className="mt-2 p-0 h-auto"
-                              onClick={() => window.location.href = notification.actionUrl}
+                              onClick={() => {
+                                if (notification.actionUrl) {
+                                  window.location.href = notification.actionUrl
+                                }
+                              }}
                             >
                               Detayları Gör →
                             </Button>

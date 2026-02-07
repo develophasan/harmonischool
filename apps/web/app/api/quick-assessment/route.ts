@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import { mergeQuickAssessment } from '@/services/neuro-engine'
 
 // Create quick assessment
 export async function POST(request: NextRequest) {
@@ -47,36 +48,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Update neuro profile if exists
-    const domainMap: Record<string, string> = {
-      executive_functions: 'executiveScore',
-      language_communication: 'languageScore',
-      social_emotional: 'emotionalScore',
-      gross_motor: 'grossMotorScore',
-      fine_motor: 'fineMotorScore',
-      logical_numerical: 'logicScore',
-      creative_expression: 'creativeScore',
-      spatial_awareness: 'spatialScore',
-      discovery_world: 'discoveryScore',
-      self_help: 'independenceScore',
-    }
-
-    const profileField = domainMap[domain]
-    if (profileField) {
-      const percentage = (finalScore / 5) * 100
-      
-      await prisma.childNeuroProfile.upsert({
-        where: { studentId },
-        update: {
-          [profileField]: percentage,
-          lastCalculated: new Date(),
-        },
-        create: {
-          studentId,
-          [profileField]: percentage,
-        },
-      })
-    }
+    // Merge quick assessment into neuro profile using Neuro Engine
+    await mergeQuickAssessment(studentId, domain, finalScore)
 
     return NextResponse.json(assessment)
   } catch (error) {

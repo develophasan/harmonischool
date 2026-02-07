@@ -9,15 +9,24 @@ export async function PATCH(
   try {
     const { id } = params
 
-    const notification = await prisma.notification.update({
-      where: { id },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
-    })
+    try {
+      const notification = await prisma.notification.update({
+        where: { id },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      })
 
-    return NextResponse.json(notification)
+      return NextResponse.json(notification)
+    } catch (tableError: any) {
+      // If table doesn't exist, return success (graceful degradation)
+      if (tableError.code === 'P2021' || tableError.message?.includes('does not exist')) {
+        console.warn('Notifications table does not exist yet.')
+        return NextResponse.json({ success: true })
+      }
+      throw tableError
+    }
   } catch (error) {
     console.error('Error updating notification:', error)
     return NextResponse.json(
@@ -35,11 +44,20 @@ export async function DELETE(
   try {
     const { id } = params
 
-    await prisma.notification.delete({
-      where: { id },
-    })
+    try {
+      await prisma.notification.delete({
+        where: { id },
+      })
 
-    return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true })
+    } catch (tableError: any) {
+      // If table doesn't exist, return success (graceful degradation)
+      if (tableError.code === 'P2021' || tableError.message?.includes('does not exist')) {
+        console.warn('Notifications table does not exist yet.')
+        return NextResponse.json({ success: true })
+      }
+      throw tableError
+    }
   } catch (error) {
     console.error('Error deleting notification:', error)
     return NextResponse.json(
