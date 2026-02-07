@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tasarım Sistemi: Organik Modernizm & Sıcak Zekâ - SARISIZ PROFESYONEL */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@layer base {
+  :root {
+    /* Ana Zemin - Saf beyaz, profesyonel - SARISIZ - HSL formatında */
+    --background: 0 0% 100%; /* #FFFFFF - Tamamen beyaz */
+    --foreground: 222 47% 11%; /* #0F172A - Slate 900 - Koyu */
+    
+    /* Kartlar - Çok hafif gri, zarif ayrışma - SARISIZ */
+    --card: 210 40% 98%; /* #F8FAFC - Slate 50 - Çok hafif gri */
+    --card-foreground: 222 47% 11%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    
+    /* Birincil Renk - Modern Teal (Zihin) - SARISIZ */
+    --primary: 173 80% 40%; /* #14B8A6 - Teal 500 */
+    --primary-foreground: 0 0% 100%;
+    
+    /* İkincil Renk - Yumuşak Mavi-Gri - SARISIZ */
+    --secondary: 214 32% 91%; /* #F1F5F9 - Slate 100 */
+    --secondary-foreground: 215 25% 27%; /* #334155 - Slate 700 */
+    
+    /* Muted - Nötr gri tonlar - SARISIZ */
+    --muted: 210 40% 98%; /* #F8FAFC - Slate 50 */
+    --muted-foreground: 215 16% 47%; /* #64748B - Slate 500 */
+    
+    /* Accent - Primary'in açık tonu - SARISIZ */
+    --accent: 166 76% 97%; /* #F0FDFA - Teal 50 - Çok açık teal */
+    --accent-foreground: 173 80% 40%;
+    
+    /* Semantic Colors - Profesyonel tonlar - SARISIZ */
+    --destructive: 0 84% 60%; /* #EF4444 - Kırmızı */
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 142 76% 36%; /* #22C55E - Emerald 500 - Yeşil */
+    --warning: 239 84% 67%; /* #6366F1 - Indigo 500 - Mavi (SARI YOK) */
+    
+    /* Harmoni OS V2 - Neuro Intelligence Colors */
+    --harmony-brain: 177 100% 25%; /* #0F766E - Exact match */
+    --harmony-heart: 25 95% 53%; /* #F4A261 - Exact match */
+    --harmony-soft: 150 20% 98%; /* #F8FAF9 - Soft white */
+    --harmony-shadow: 177 100% 25% / 0.12; /* rgba(15,118,110,.12) */
+    --neuro-purple: 239 84% 67%; /* #6366F1 - Indigo - AI */
+    --emotion-rose: 350 89% 60%; /* #FB7185 - Rose - Mood */
+    --growth-green: 142 76% 36%; /* #22C55E - Green */
+    --alert-amber: 38 92% 50%; /* #F59E0B - Amber */
+    --risk-red: 0 84% 60%; /* #EF4444 - Red */
+    
+    /* Border ve Input - SARISIZ */
+    --border: 214 32% 91%; /* #E2E8F0 - Slate 200 */
+    --input: 214 32% 91%; /* #F1F5F9 - Slate 100 */
+    --ring: 173 80% 40%; /* Primary rengi */
+    
+    /* Border Radius - Modern yuvarlatma */
+    --radius: 0.75rem; /* 12px - rounded-xl */
+  }
+
+  .dark {
+    --background: 15 23 42; /* #0F172A - Slate 900 */
+    --foreground: 248 250 252; /* #F8FAFC - Slate 50 */
+    --card: 30 41 59; /* #1E293B - Slate 800 */
+    --card-foreground: 248 250 252;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
+    --primary: 20 184 166; /* Teal 500 */
+    --primary-foreground: 255 255 255;
+    --secondary: 51 65 85; /* Slate 700 */
+    --secondary-foreground: 248 250 252;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184; /* Slate 400 */
+    --accent: 30 41 59;
+    --accent-foreground: 248 250 252;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 20 184 166;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body {
+    background-color: #ffffff !important; /* Direkt beyaz - SARISIZ */
+  }
+  
+  body {
+    @apply font-sans antialiased;
+    color: hsl(var(--foreground));
+  }
+}
+
+/* !important ile override - SARISIZ - TÜM SAYFALAR İÇİN */
+@layer utilities {
+  .bg-background {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+  }
+  
+  /* Tüm min-h-screen container'lar için beyaz arka plan */
+  [class*="min-h-screen"] {
+    background-color: #ffffff !important;
+  }
+  
+  /* Tüm sayfa container'ları için */
+  main, div[class*="min-h-screen"] {
+    background-color: #ffffff !important;
+  }
+  
+  /* Tüm div'ler için eğer bg-background varsa */
+  div.bg-background {
+    background-color: #ffffff !important;
+  }
+  
+  /* Tipografi - Başlıklar için Outfit, Body için Inter */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+  
+  /* Profesyonel gölgeler - Nötr ve zarif - SARISIZ */
+  .shadow-soft {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-soft-lg {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-soft-xl {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* V2 Design System - Glassmorphism (Light) */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(15, 118, 110, 0.12);
+  }
+
+  .glass-card-light {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(15, 118, 110, 0.12);
+  }
+
+  /* V2 Design System - Micro Interactions */
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply shadow-xl;
+    transform: translateY(-4px) scale(1.02);
+  }
+
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px) scale(1.02);
+  }
+
+  /* Pastel gradient transitions */
+  .gradient-pastel {
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.05) 0%, rgba(244, 162, 97, 0.05) 100%);
+  }
+
+  .fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* V2 Design System - Alert Border (Soft, not scary) */
+  .alert-border-left {
+    border-left: 4px solid;
+  }
+
+  .alert-border-red {
+    border-left-color: hsl(var(--risk-red));
+  }
+
+  .alert-border-amber {
+    border-left-color: hsl(var(--alert-amber));
+  }
+
+  .alert-card {
+    @apply rounded-2xl shadow-xl;
+    border-left: 4px solid;
+  }
+
+  .alert-card-red {
+    border-left-color: hsl(var(--risk-red));
+  }
+
+  .alert-card-amber {
+    border-left-color: hsl(var(--alert-amber));
+  }
+
+  /* V2 Design System - Gradient Text */
+  .gradient-text-brain {
+    background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-heart {
+    background: linear-gradient(135deg, #F4A261 0%, #FB7185 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-harmony {
+    background: linear-gradient(135deg, #0F766E 0%, #F4A261 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
