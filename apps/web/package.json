@@ -15,7 +15,8 @@
     "db:studio": "node -r dotenv/config -e \"require('dotenv').config(); require('child_process').execSync('npx prisma studio', {stdio: 'inherit'})\"",
     "v3:init-norms": "npx tsx scripts/init-age-norms.ts",
     "v3:calc-z": "npx tsx scripts/calculate-z-profiles.ts",
-    "v3:calc-risk": "npx tsx scripts/calculate-risk-profiles.ts"
+    "v3:calc-risk": "npx tsx scripts/calculate-risk-profiles.ts",
+    "v3:calc-cohort": "npx tsx scripts/calculate-cohort-stats.ts"
   },
   "dependencies": {
     "@harmoni/ui": "*",

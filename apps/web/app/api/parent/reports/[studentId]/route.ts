@@ -7,7 +7,7 @@ import { successResponse } from '@/lib/api/utils'
 // GET /api/parent/reports/[studentId] - Get development reports
 export async function GET(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     // TODO: Verify parent has access

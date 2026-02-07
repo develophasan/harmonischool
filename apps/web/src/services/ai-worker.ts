@@ -14,6 +14,9 @@ import { prisma } from '@/lib/db/prisma'
 import { getZProfileHistory, calculateAgeInMonths } from './z-score-engine'
 import { calculateRiskScore } from './risk-engine'
 import { generateExplanation } from './explainability-engine'
+import { calculateCohortZScores } from './cohort-z-score-engine'
+import { clinicalRisk, aggregateRisk } from './clinical-risk-matrix'
+import { formatDomainName, getClinicalTerm } from './clinical-terminology'
 
 // Initialize Gemini
 // @ts-ignore - GoogleGenAI types
@@ -37,6 +40,7 @@ export async function generateChildSummary(studentId: string, date: Date = new D
       include: {
         neuroProfile: true,
         neuroRiskProfile: true,
+        domainStats: true,
         emotionSnapshots: {
           where: {
             date: {
@@ -58,6 +62,9 @@ export async function generateChildSummary(studentId: string, date: Date = new D
     const zHistory = await getZProfileHistory(studentId, 4)
     const riskData = await calculateRiskScore(studentId)
     const explanation = await generateExplanation(studentId)
+    
+    // Get cohort-based Z-scores (clinical grade)
+    const cohortZScores = await calculateCohortZScores(studentId)
 
     // Get current Z-scores
     const currentZScores: Record<string, number> = {}
@@ -104,40 +111,107 @@ export async function generateChildSummary(studentId: string, date: Date = new D
       })),
     }
 
-    // Build V3 prompt with statistical intelligence
+    // Build clinical terminology context
+    const clinicalContext: Record<string, any> = {}
+    Object.entries(cohortZScores).forEach(([domain, zScore]) => {
+      const term = getClinicalTerm(domain)
+      if (term) {
+        clinicalContext[domain] = {
+          zScore,
+          clinicalName: term.clinicalName,
+          parentName: term.parentFriendlyName,
+        }
+      }
+    })
+
+    // Calculate age norm band
+    const ageNormBand = ageInMonths < 36 ? '24-36 months' 
+      : ageInMonths < 48 ? '36-48 months'
+      : ageInMonths < 60 ? '48-60 months'
+      : '60+ months'
+
+    // Build V3 Clinical Prompt
     const prompt = `
-Sen Harmoni Neuro Coach AI'sın. ${context.name} (${context.ageInMonths} ay) için nörogelişimsel analiz yapıyorsun.
+You are a pediatric neurodevelopment assistant.
 
-İSTATİSTİKSEL VERİLER:
-- Z-Skorları (yaş normuna göre normalize edilmiş): ${JSON.stringify(context.zScores)}
-- Risk Skoru: ${context.riskScore.toFixed(2)} (${context.riskSeverity})
-- Trend Eğimi: ${context.trendSlope.toFixed(3)} (negatif = gerileme)
-- En Zayıf Alan: ${context.weakestDomain || 'Yok'}
-- En Güçlü Alan: ${context.strongestDomain || 'Yok'}
-- Gerileyen Alan: ${context.decliningDomain || 'Yok'}
-- Duygusal İstikrarsızlık: ${context.emotionalInstability.toFixed(2)}
-- Alan Dengesizliği: ${context.domainImbalance.toFixed(2)}
+ROLE:
+- Use developmental psychology language
+- Avoid medical diagnosis
+- Use observational terminology
+- Be warm, professional, and hope-oriented
 
-AÇIKLAMA VERİLERİ:
+CHILD PROFILE:
+- Name: ${context.name}
+- Age: ${context.ageInMonths} months (${ageNormBand})
+- Age Norm Band: ${ageNormBand}
+
+Z-SCORES (Cohort-based, CDC/Bayley compatible):
+${JSON.stringify(clinicalContext, null, 2)}
+
+RISK ASSESSMENT:
+- Overall Risk: ${context.riskSeverity}
+- Risk Score: ${context.riskScore.toFixed(2)}
+- Trend Slope: ${context.trendSlope.toFixed(3)} (negative = decline)
+- Weakest Domain: ${context.weakestDomain ? formatDomainName(context.weakestDomain, 'parent') : 'None'}
+- Strongest Domain: ${context.strongestDomain ? formatDomainName(context.strongestDomain, 'parent') : 'None'}
+- Declining Domain: ${context.decliningDomain ? formatDomainName(context.decliningDomain, 'parent') : 'None'}
+
+WEEKLY TRENDS:
+${JSON.stringify(zHistory.slice(-4).map(h => ({
+  week: h.weekStart.toISOString().split('T')[0],
+  domain: formatDomainName(h.domain, 'parent'),
+  zScore: h.zScore.toFixed(2),
+  percentile: h.percentile.toFixed(1),
+})), null, 2)}
+
+RECENT EMOTIONS:
+${JSON.stringify(context.recentMoods || [], null, 2)}
+
+EXPLANATION DATA:
 ${JSON.stringify(context.explanation, null, 2)}
 
-GÖREV:
-Strict JSON formatında döndür (başka metin ekleme):
+TASKS:
+
+1. Summarize developmental status using observational clinical language.
+   - Highlight strengths first
+   - Mention risk domains gently (if any)
+   - Use parent-friendly Turkish
+
+2. Risk explanation (if risk exists):
+   - Simple, non-alarming language
+   - Focus on support, not problems
+   - Never diagnose
+
+3. Home activity:
+   - Specific to weakest domain: ${context.weakestDomain ? formatDomainName(context.weakestDomain, 'parent') : 'general'}
+   - One concrete, actionable activity
+   - Age-appropriate
+
+4. Positive reinforcement:
+   - Highlight strongest domain or general strengths
+   - Encourage continued engagement
+
+TONE:
+- Warm and supportive
+- Professional but accessible
+- Hope-oriented
+- Never scary or clinical
+
+FORMAT:
+Return strict JSON (no other text):
 
 {
-  "summary": "2 cümlelik gelişim özeti (pozitif, destekleyici)",
-  "riskExplanation": "Risk varsa basit Türkçe açıklama, yoksa null",
-  "homeActivity": "En zayıf alana özel ev aktivitesi (1-2 cümle)",
-  "positiveNote": "Güçlü yönleri vurgulayan pozitif not (1 cümle)"
+  "summary": "2 sentences: developmental status in observational language",
+  "riskExplanation": "Simple Turkish explanation if risk exists, else null",
+  "homeActivity": "One specific activity for weakest domain",
+  "positiveNote": "One sentence highlighting strengths"
 }
 
-KURALLAR:
-- summary: Her zaman pozitif ve destekleyici
-- riskExplanation: Sadece risk varsa (severity: medium/high), basit Türkçe
-- homeActivity: ${context.weakestDomain} alanına özel, somut aktivite
-- positiveNote: ${context.strongestDomain} veya genel güçlü yönler
-
-DİL: Türkçe, sıcak, ebeveyn dostu
+IMPORTANT:
+- Never diagnose
+- Never use medical terminology with parents
+- Always be supportive and encouraging
+- Use observational language only
 `
 
     if (!genAI) {

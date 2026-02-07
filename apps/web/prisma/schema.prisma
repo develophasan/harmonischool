@@ -77,6 +77,7 @@ model Student {
   psychologistNotes    PsychologistNote[]
   neuroProfile         ChildNeuroProfile?
   neuroZProfiles       ChildNeuroZProfile[]
+  domainStats          ChildDomainStats[]
   neuroRiskProfile     NeuroRiskProfile?
   neuroAlerts          NeuroAlert[]
   emotionSnapshots     DailyEmotionSnapshot[]
@@ -578,6 +579,27 @@ model ChildNeuroZProfile {
   @@index([studentId, weekStart])
   @@index([domain])
   @@map("child_neuro_z_profiles")
+}
+
+// Domain Statistics - Cohort-based mean and std for Z-score calculation
+model ChildDomainStats {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  domain      String   // Domain code
+  mean        Float    // Cohort mean (same age band)
+  std         Float    // Cohort standard deviation
+  cohortSize  Int      @default(0) @map("cohort_size")
+  ageInMonths Int      @map("age_in_months")
+  calculatedAt DateTime @default(now()) @map("calculated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, domain])
+  @@index([studentId])
+  @@index([domain, ageInMonths])
+  @@map("child_domain_stats")
 }
 
 // Statistical Risk Profile - Calculated risk scores

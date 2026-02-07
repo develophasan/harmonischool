@@ -35,7 +35,12 @@ export async function GET(
 
     if (!student) {
       return NextResponse.json(
-        { error: 'Student not found' },
+        { 
+          success: false,
+          error: 'Student not found',
+          studentId,
+          hint: 'Try GET /api/test/students to see available student IDs'
+        },
         { status: 404 }
       )
     }

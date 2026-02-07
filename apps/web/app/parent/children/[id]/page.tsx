@@ -5,9 +5,12 @@ import { Heart, TrendingUp, TrendingDown, Activity, Calendar, ArrowLeft, ArrowUp
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useParentId, useParentChild } from "@/hooks/api/use-parent"
+import { useAISummary } from "@/hooks/api/use-ai"
 import { NeuroDNAProfile } from "@/components/neuro/NeuroDNAProfile"
+import { TrajectoryChart } from "@/components/neuro/TrajectoryChart"
+import { ActivityRecommendations } from "@/components/neuro/ActivityRecommendations"
 import { motion } from "framer-motion"
-import { useState, useEffect } from "react"
+import { Download } from "lucide-react"
 
 interface StudentDetail {
   id: string
@@ -94,14 +97,7 @@ export default function ParentChildDetailPage() {
   const age = calculateAge(child.dateOfBirth)
   const classInfo = child.classStudents?.[0]?.class
   const lastAssessment = child.assessments?.[0]
-  const [aiSummary, setAiSummary] = useState<any>(null)
-
-  useEffect(() => {
-    fetch(`/api/ai/summary/${child.id}`)
-      .then((res) => res.json())
-      .then((data) => setAiSummary(data))
-      .catch(console.error)
-  }, [child.id])
+  const { data: aiSummary, isLoading: aiSummaryLoading } = useAISummary(child.id)
 
   // Mock trend data - replace with real API call
   const trends = [
@@ -198,7 +194,59 @@ export default function ParentChildDetailPage() {
           </motion.div>
         </div>
 
-        {/* Alt: AI Summary Block */}
+        {/* V3 Components: Trajectory & Activities */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TrajectoryChart studentId={child.id} />
+          <ActivityRecommendations studentId={child.id} />
+        </div>
+
+        {/* Clinical Export Button */}
+        <Card className="rounded-2xl shadow-xl border-0 glass-card hover-lift">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold mb-1">Klinik Rapor</h3>
+                <p className="text-sm text-muted-foreground">
+                  Psikolog ve uzmanlar için detaylı PDF raporu
+                </p>
+              </div>
+              <Button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/neuro/clinical-export/${child.id}`)
+                    if (!res.ok) throw new Error('PDF oluşturulamadı')
+                    const blob = await res.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `clinical-report-${child.id}.pdf`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    window.URL.revokeObjectURL(url)
+                  } catch (error) {
+                    console.error('Error downloading PDF:', error)
+                    alert('PDF indirilemedi. Lütfen tekrar deneyin.')
+                  }
+                }}
+                className="rounded-xl"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                PDF İndir
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Alt: AI Summary Block - V3 Format */}
+        {aiSummaryLoading && (
+          <Card className="rounded-2xl shadow-xl border-0 glass-card">
+            <CardContent className="p-8 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">AI özeti hazırlanıyor...</p>
+            </CardContent>
+          </Card>
+        )}
         {aiSummary && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -214,13 +262,40 @@ export default function ParentChildDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* V3: summary field */}
                   <p className="text-sm leading-relaxed text-foreground">
-                    {aiSummary.progressText}
+                    {aiSummary.summary || aiSummary.progressText}
                   </p>
-                  {aiSummary.homeRecommendation && (
+                  
+                  {/* V3: riskExplanation */}
+                  {aiSummary.riskExplanation && (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-alert-amber/10 to-alert-amber/5 border border-alert-amber/20">
+                      <h4 className="font-semibold text-sm text-alert-amber mb-2">⚠️ Risk Açıklaması</h4>
+                      <p className="text-sm text-foreground">{aiSummary.riskExplanation}</p>
+                    </div>
+                  )}
+                  
+                  {/* V3: homeActivity (replaces homeRecommendation) */}
+                  {aiSummary.homeActivity && (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-harmony-heart/10 to-harmony-heart/5 border border-harmony-heart/20">
+                      <h4 className="font-semibold text-sm text-harmony-heart mb-2">🏡 Ev Aktivitesi</h4>
+                      <p className="text-sm text-foreground">{aiSummary.homeActivity}</p>
+                    </div>
+                  )}
+                  
+                  {/* Fallback: V2 format */}
+                  {!aiSummary.homeActivity && aiSummary.homeRecommendation && (
                     <div className="p-4 rounded-xl bg-gradient-to-br from-harmony-heart/10 to-harmony-heart/5 border border-harmony-heart/20">
                       <h4 className="font-semibold text-sm text-harmony-heart mb-2">🏡 Home Tip</h4>
                       <p className="text-sm text-foreground">{aiSummary.homeRecommendation}</p>
+                    </div>
+                  )}
+                  
+                  {/* V3: positiveNote */}
+                  {aiSummary.positiveNote && (
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-growth-green/10 to-growth-green/5 border border-growth-green/20">
+                      <h4 className="font-semibold text-sm text-growth-green mb-2">✨ Pozitif Not</h4>
+                      <p className="text-sm text-foreground">{aiSummary.positiveNote}</p>
                     </div>
                   )}
                 </div>
